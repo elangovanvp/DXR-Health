@@ -1,0 +1,686 @@
+{
+  "info": {
+    "name": "DXR Health API",
+    "_postman_id": "dxr-health-collection-v1",
+    "description": "Cloud-Native AI-Ready Diagnostic X-Ray Ingestion, Triage & Workflow Platform Postman Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Health",
+      "item": [
+        {
+          "name": "Service Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Service status is UP\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"UP\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Patient",
+      "item": [
+        {
+          "name": "Create Synthetic Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"syntheticReference\": \"SYNTH-POSTMAN-\" + Date.now(),\n  \"ageBand\": \"45-54\",\n  \"sexCode\": \"F\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients"]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.variables.set(\"randomRef\", \"SYNTH-POSTMAN-\" + Math.floor(Math.random() * 100000));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Patient ID is assigned\", function () {",
+                  "    pm.expect(jsonData.patientId).to.be.a('string');",
+                  "    pm.environment.set(\"patientId\", jsonData.patientId);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Patient by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative - Get Missing Patient (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/NON-EXISTENT-PATIENT",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "NON-EXISTENT-PATIENT"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.expect(jsonData.errorCode).to.eql(\"RESOURCE_NOT_FOUND\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Study",
+      "item": [
+        {
+          "name": "Create Diagnostic X-Ray Study",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"{{patientId}}\",\n  \"bodyRegion\": \"CHEST\",\n  \"modality\": \"DX\",\n  \"clinicalIndication\": \"Acute tension pneumothorax suspicion\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Study ID created in RECEIVED status\", function () {",
+                  "    pm.expect(jsonData.studyId).to.be.a('string');",
+                  "    pm.expect(jsonData.workflowStatus).to.eql(\"RECEIVED\");",
+                  "    pm.environment.set(\"studyId\", jsonData.studyId);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Study Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.expect(jsonData.studyId).to.eql(pm.environment.get(\"studyId\"));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Patient Studies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/patients/{{patientId}}/studies",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "patients", "{{patientId}}", "studies"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.expect(jsonData).to.be.an('array');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Imaging Ingestion",
+      "item": [
+        {
+          "name": "Multipart Upload Valid Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "samples/synthetic_chest_dx.png"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/images",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "images"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Image ingested and status moved to VALIDATED\", function () {",
+                  "    pm.expect(jsonData.imageId).to.be.a('string');",
+                  "    pm.expect(jsonData.workflowStatus).to.eql(\"VALIDATED\");",
+                  "    pm.environment.set(\"imageId\", jsonData.imageId);",
+                  "    pm.environment.set(\"sha256\", jsonData.sha256);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative - Duplicate Image Upload (409)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "samples/synthetic_chest_dx.png"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/images",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "images"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 409 Conflict on duplicate hash\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.expect(jsonData.errorCode).to.eql(\"WORKFLOW_CONFLICT\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - AI Triage",
+      "item": [
+        {
+          "name": "Run AI Triage",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/triage",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "triage"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Priority belongs to CRITICAL/HIGH/ROUTINE\", function () {",
+                  "    pm.expect([\"CRITICAL\", \"HIGH\", \"ROUTINE\"]).to.include(jsonData.priority);",
+                  "    pm.expect(jsonData.status).to.eql(\"READY\");",
+                  "    pm.expect(jsonData.confidence).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Triage Result",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/triage",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "triage"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Worklist",
+      "item": [
+        {
+          "name": "Get Prioritized Worklist (All)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/worklist",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "worklist"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.expect(jsonData).to.be.an('array');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter Worklist by CRITICAL Priority",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/worklist?priority=CRITICAL",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "worklist"],
+              "query": [
+                { "key": "priority", "value": "CRITICAL" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "jsonData.forEach(function(item) {",
+                  "    pm.expect(item.priority).to.eql(\"CRITICAL\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 - Reporting",
+      "item": [
+        {
+          "name": "Update Study to IN_REVIEW",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetStatus\": \"IN_REVIEW\",\n  \"actorRef\": \"Dr. Sarah Chen, MD\",\n  \"details\": \"Claimed for radiologist reporting\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "status"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.expect(pm.response.json().workflowStatus).to.eql(\"IN_REVIEW\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Draft Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"findings\": \"Evidence of right apical pneumothorax without tension physiology.\",\n  \"impression\": \"Small right pneumothorax. Conservative management suggested.\",\n  \"authorRef\": \"Dr. Sarah Chen, MD\",\n  \"verified\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "reports"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.expect(jsonData.reportStatus).to.eql(\"DRAFT\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify and Finalize Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"findings\": \"Evidence of right apical pneumothorax without tension physiology.\",\n  \"impression\": \"Small right pneumothorax. Verified and signed.\",\n  \"authorRef\": \"Dr. Sarah Chen, MD\",\n  \"verified\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "reports"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.expect(jsonData.reportStatus).to.eql(\"FINAL\");",
+                  "pm.expect(jsonData.verifiedAt).to.not.be.null;"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read Completed Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "reports"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 - Negative / Conflict",
+      "item": [
+        {
+          "name": "Modify Already Verified Report (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"findings\": \"Attempting illegal edit\",\n  \"impression\": \"Illegal modify\",\n  \"authorRef\": \"Dr. Rogue\",\n  \"verified\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies/{{studyId}}/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies", "{{studyId}}", "reports"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 409 Conflict\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.expect(pm.response.json().errorCode).to.eql(\"WORKFLOW_CONFLICT\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Triage Without Image (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"{{patientId}}\",\n  \"bodyRegion\": \"CHEST\",\n  \"modality\": \"DX\",\n  \"clinicalIndication\": \"No image study\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var noImgStudyId = jsonData.studyId;",
+                  "pm.sendRequest({",
+                  "    url: pm.environment.get(\"baseUrl\") + \"/api/v1/studies/\" + noImgStudyId + \"/triage\",",
+                  "    method: 'POST'",
+                  "}, function (err, res) {",
+                  "    pm.test(\"Triage without image returns 409 Conflict\", function() {",
+                  "        pm.expect(res.code).to.eql(409);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed Payload (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"\",\n  \"modality\": \"INVALID_MODALITY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/studies",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "studies"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
